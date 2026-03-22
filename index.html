@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EduTrack — Student Management System</title>
+  <title>EduTrack — School Management System</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-text">EduTrack</div>
-    <div class="logo-sub">Student Management</div>
+    <div class="logo-sub">School Management</div>
   </div>
   <nav>
     <div class="nav-label">Overview</div>
@@ -24,20 +24,18 @@
     <div class="nav-item" onclick="navigate('students')">
       <span class="nav-icon">👨‍🎓</span> Students
     </div>
-    <div class="nav-item" onclick="navigate('departments')">
-      <span class="nav-icon">🏛️</span> Departments
+    <div class="nav-item" onclick="navigate('classes')">
+      <span class="nav-icon">🏫</span> Classes
     </div>
-    <div class="nav-item" onclick="navigate('courses')">
-      <span class="nav-icon">📚</span> Courses
+    <div class="nav-item" onclick="navigate('teachers')">
+      <span class="nav-icon">👨‍🏫</span> Teachers
+    </div>
+    <div class="nav-item" onclick="navigate('subjects')">
+      <span class="nav-icon">📚</span> Subjects
     </div>
     <div class="nav-item" onclick="navigate('marks')">
       <span class="nav-icon">📝</span> Marks
     </div>
-    <div class="nav-item" onclick="navigate('attendance')">
-      <span class="nav-icon">✅</span> Attendance
-    </div>
-
-    
   </nav>
   <div class="sidebar-footer">Person 3 &amp; 4 — Frontend</div>
 </aside>
@@ -55,7 +53,7 @@
 
   <div class="content">
 
-    <!-- ===== DASHBOARD SECTION ===== -->
+    <!-- ===== DASHBOARD ===== -->
     <div id="section-dashboard" class="section active">
       <div class="stats-grid">
         <div class="stat-card blue">
@@ -63,20 +61,20 @@
           <div class="stat-value" id="stat-students">0</div>
           <div class="stat-label">Total Students</div>
         </div>
-        <div class="stat-card purple">
-          <div class="stat-icon">🏛️</div>
-          <div class="stat-value" id="stat-depts">0</div>
-          <div class="stat-label">Departments</div>
-        </div>
         <div class="stat-card green">
-          <div class="stat-icon">📚</div>
-          <div class="stat-value" id="stat-courses">0</div>
-          <div class="stat-label">Courses</div>
+          <div class="stat-icon">🏫</div>
+          <div class="stat-value" id="stat-classes">0</div>
+          <div class="stat-label">Classes</div>
+        </div>
+        <div class="stat-card purple">
+          <div class="stat-icon">👨‍🏫</div>
+          <div class="stat-value" id="stat-teachers">0</div>
+          <div class="stat-label">Teachers</div>
         </div>
         <div class="stat-card yellow">
-          <div class="stat-icon">✅</div>
-          <div class="stat-value" id="stat-attendance">0%</div>
-          <div class="stat-label">Avg Attendance</div>
+          <div class="stat-icon">📚</div>
+          <div class="stat-value" id="stat-subjects">0</div>
+          <div class="stat-label">Subjects</div>
         </div>
       </div>
 
@@ -85,7 +83,7 @@
           <div class="card-header"><span class="card-title">Recent Students</span></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Name</th><th>Department</th><th>Status</th></tr></thead>
+              <thead><tr><th>Name</th><th>Age</th><th>Class</th></tr></thead>
               <tbody id="dash-students-body"></tbody>
             </table>
           </div>
@@ -94,7 +92,7 @@
           <div class="card-header"><span class="card-title">Top Performers</span></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Student</th><th>Course</th><th>Marks</th></tr></thead>
+              <thead><tr><th>Student</th><th>Subject</th><th>Score</th></tr></thead>
               <tbody id="dash-marks-body"></tbody>
             </table>
           </div>
@@ -102,12 +100,12 @@
       </div>
     </div>
 
-    <!-- ===== STUDENTS SECTION ===== -->
+    <!-- ===== STUDENTS ===== -->
     <div id="section-students" class="section">
       <div class="search-bar">
         <div class="search-input-wrap">
           <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search students by name or department..." oninput="filterStudents(this.value)">
+          <input type="text" placeholder="Search by name or class..." oninput="filterStudents(this.value)">
         </div>
       </div>
       <div class="card">
@@ -119,8 +117,7 @@
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Name</th><th>Department</th>
-                <th>Avg Marks</th><th>Attendance</th><th>Actions</th>
+                <th>ID</th><th>Name</th><th>Age</th><th>Class</th><th>Avg Score</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="students-body"></tbody>
@@ -129,67 +126,90 @@
       </div>
     </div>
 
-    <!-- ===== DEPARTMENTS SECTION ===== -->
-    <div id="section-departments" class="section">
+    <!-- ===== CLASSES ===== -->
+    <div id="section-classes" class="section">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Departments</span>
-          <span class="badge badge-purple" id="depts-count">0 total</span>
+          <span class="card-title">Classes</span>
+          <span class="badge badge-green" id="classes-count">0 total</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Department Name</th>
-                <th>Courses</th><th>Students</th><th>Actions</th>
+                <th>ID</th><th>Class Name</th><th>Students</th><th>Actions</th>
               </tr>
             </thead>
-            <tbody id="depts-body"></tbody>
+            <tbody id="classes-body"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ===== COURSES SECTION ===== -->
-    <div id="section-courses" class="section">
+    <!-- ===== TEACHERS ===== -->
+    <div id="section-teachers" class="section">
+      <div class="search-bar">
+        <div class="search-input-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" placeholder="Search by name or subject..." oninput="filterTeachers(this.value)">
+        </div>
+      </div>
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Courses</span>
-          <span class="badge badge-green" id="courses-count">0 total</span>
+          <span class="card-title">All Teachers</span>
+          <span class="badge badge-purple" id="teachers-count">0 total</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Course Name</th><th>Department</th>
-                <th>Enrolled</th><th>Avg Score</th><th>Actions</th>
+                <th>ID</th><th>Name</th><th>Subject</th><th>Classes Taught</th><th>Actions</th>
               </tr>
             </thead>
-            <tbody id="courses-body"></tbody>
+            <tbody id="teachers-body"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ===== MARKS SECTION ===== -->
+    <!-- ===== SUBJECTS ===== -->
+    <div id="section-subjects" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Subjects</span>
+          <span class="badge badge-yellow" id="subjects-count">0 total</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th><th>Subject Name</th><th>Teacher</th><th>Avg Score</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="subjects-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MARKS ===== -->
     <div id="section-marks" class="section">
       <div class="search-bar">
         <div class="search-input-wrap">
           <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search by student or course..." oninput="filterMarks(this.value)">
+          <input type="text" placeholder="Search by student or subject..." oninput="filterMarks(this.value)">
         </div>
       </div>
       <div class="card">
         <div class="card-header">
           <span class="card-title">Marks Record</span>
-          <span class="badge badge-yellow" id="marks-count">0 entries</span>
+          <span class="badge badge-blue" id="marks-count">0 entries</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Student</th><th>Course</th><th>Marks</th>
-                <th>Grade</th><th>Progress</th><th>Actions</th>
+                <th>Mark ID</th><th>Student</th><th>Subject</th><th>Score</th><th>Grade</th><th>Progress</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="marks-body"></tbody>
@@ -197,33 +217,6 @@
         </div>
       </div>
     </div>
-
-    <!-- ===== ATTENDANCE SECTION ===== -->
-    <div id="section-attendance" class="section">
-      <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search by student..." oninput="filterAttendance(this.value)">
-        </div>
-        <input type="date" id="att-date-filter" onchange="filterAttendance('')" style="width:180px">
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">Attendance Records</span>
-          <span class="badge badge-green" id="att-count">0 entries</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Student</th><th>Date</th><th>Status</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="att-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-   
 
   </div><!-- end .content -->
 </main>

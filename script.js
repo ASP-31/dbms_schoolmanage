@@ -1,28 +1,17 @@
-/*
-    File only created for testing purposes to check the functionality. Final changes will be made 
-
-
-
-*/
-
-
-
-
-
-
 const API = "http://localhost:3000/api";
 
-let currentSection = "dashboard";
+let currentSection = "students";
 
-let students = [];
-let departments = [];
-let courses = [];
+let student = [];
+let classes = [];
+let teachers = [];
+let subjects = [];
 let marks = [];
-let attendance = [];
+
 
 /* ---------------- NAVIGATION ---------------- */
 
-function navigate(section) {
+function navigate(section, event) {
 
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
   document.getElementById(`section-${section}`).classList.add("active");
@@ -32,11 +21,9 @@ function navigate(section) {
 
   currentSection = section;
 
-  document.getElementById("pageTitle").innerText =
-    section.charAt(0).toUpperCase() + section.slice(1);
-
   loadSectionData();
 }
+
 
 /* ---------------- LOAD DATA ---------------- */
 
@@ -44,22 +31,28 @@ async function loadSectionData() {
 
   try {
 
-    if (currentSection === "students") {
-      const res = await fetch(`${API}/students`);
-      students = await res.json();
+    if (currentSection === "student") {
+      const res = await fetch(`${API}/student`);
+      student = await res.json();
       renderStudents();
     }
 
-    if (currentSection === "departments") {
-      const res = await fetch(`${API}/departments`);
-      departments = await res.json();
-      renderDepartments();
+    if (currentSection === "class") {
+      const res = await fetch(`${API}/class`);
+      classes = await res.json();
+      renderClasses();
     }
 
-    if (currentSection === "courses") {
-      const res = await fetch(`${API}/courses`);
-      courses = await res.json();
-      renderCourses();
+    if (currentSection === "teacher") {
+      const res = await fetch(`${API}/teacher`);
+      teachers = await res.json();
+      renderTeachers();
+    }
+
+    if (currentSection === "subject") {
+      const res = await fetch(`${API}/subject`);
+      subjects = await res.json();
+      renderSubjects();
     }
 
     if (currentSection === "marks") {
@@ -68,39 +61,11 @@ async function loadSectionData() {
       renderMarks();
     }
 
-    if (currentSection === "attendance") {
-      const res = await fetch(`${API}/attendance`);
-      attendance = await res.json();
-      renderAttendance();
-    }
-
-    if (currentSection === "dashboard") {
-      loadDashboard();
-    }
-
   } catch (err) {
     toast("Error loading data");
   }
 }
 
-/* ---------------- DASHBOARD ---------------- */
-
-async function loadDashboard() {
-
-  const s = await fetch(`${API}/students`).then(r => r.json());
-  const d = await fetch(`${API}/departments`).then(r => r.json());
-  const c = await fetch(`${API}/courses`).then(r => r.json());
-  const a = await fetch(`${API}/attendance`).then(r => r.json());
-
-  document.getElementById("stat-students").innerText = s.length;
-  document.getElementById("stat-depts").innerText = d.length;
-  document.getElementById("stat-courses").innerText = c.length;
-
-  let present = a.filter(x => x.status === "present").length;
-  let avg = a.length ? Math.round((present / a.length) * 100) : 0;
-
-  document.getElementById("stat-attendance").innerText = avg + "%";
-}
 
 /* ---------------- STUDENTS ---------------- */
 
@@ -109,27 +74,20 @@ function renderStudents() {
   const body = document.getElementById("students-body");
   body.innerHTML = "";
 
-  students.forEach(s => {
+  student.forEach(s => {
 
-    const row = `
+    body.innerHTML += `
       <tr>
-        <td>${s.id}</td>
-        <td>${s.first_name} ${s.last_name}</td>
-        <td>${s.department_name || "-"}</td>
-        <td>${s.avg_marks || "-"}</td>
-        <td>${s.attendance || "-"}</td>
+        <td>${s.StudentID}</td>
+        <td>${s.Name}</td>
+        <td>${s.Age}</td>
+        <td>${s.ClassID}</td>
         <td>
           <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})">Delete</button>
         </td>
       </tr>
     `;
-
-    body.innerHTML += row;
-
   });
-
-  document.getElementById("students-count").innerText =
-    students.length + " total";
 }
 
 async function clearSectionData() {
@@ -158,67 +116,108 @@ async function deleteStudent(id) {
 
   if (!confirm("Delete student?")) return;
 
-  await fetch(`${API}/students/${id}`, {
+  await fetch(`${API}/student/${id}`, {
     method: "DELETE"
   });
 
   loadSectionData();
 }
 
-/* ---------------- DEPARTMENTS ---------------- */
 
-function renderDepartments() {
+/* ---------------- CLASSES ---------------- */
 
-  const body = document.getElementById("depts-body");
+function renderClasses() {
+
+  const body = document.getElementById("classes-body");
   body.innerHTML = "";
 
-  departments.forEach(d => {
+  classes.forEach(c => {
 
     body.innerHTML += `
       <tr>
-        <td>${d.id}</td>
-        <td>${d.name}</td>
-        <td>${d.courses || 0}</td>
-        <td>${d.students || 0}</td>
+        <td>${c.ClassID}</td>
+        <td>${c.ClassName}</td>
         <td>
           <button class="btn btn-danger btn-sm" onclick="deleteDepartment(${d.id})">Delete</button>
         </td>
       </tr>
     `;
-
   });
-
-  document.getElementById("depts-count").innerText =
-    departments.length + " total";
 }
 
-/* ---------------- COURSES ---------------- */
+async function deleteClass(id) {
 
-function renderCourses() {
+  await fetch(`${API}/class/${id}`, {
+    method: "DELETE"
+  });
 
-  const body = document.getElementById("courses-body");
+  loadSectionData();
+}
+
+
+/* ---------------- TEACHERS ---------------- */
+
+function renderTeachers() {
+
+  const body = document.getElementById("teachers-body");
   body.innerHTML = "";
 
-  courses.forEach(c => {
+  teachers.forEach(t => {
 
     body.innerHTML += `
       <tr>
-        <td>${c.id}</td>
-        <td>${c.name}</td>
-        <td>${c.department_name || "-"}</td>
-        <td>${c.enrolled || 0}</td>
-        <td>${c.avg_score || "-"}</td>
+        <td>${t.TeacherID}</td>
+        <td>${t.Name}</td>
+        <td>${t.Subject}</td>
         <td>
           <button class="btn btn-danger btn-sm" onclick="deleteCourse(${c.id})">Delete</button>
         </td>
       </tr>
     `;
+  });
+}
 
+async function deleteTeacher(id) {
+
+  await fetch(`${API}/teacher/${id}`, {
+    method: "DELETE"
   });
 
-  document.getElementById("courses-count").innerText =
-    courses.length + " total";
+  loadSectionData();
 }
+
+
+/* ---------------- SUBJECTS ---------------- */
+
+function renderSubjects() {
+
+  const body = document.getElementById("subject-body");
+  body.innerHTML = "";
+
+  subjects.forEach(s => {
+
+    body.innerHTML += `
+      <tr>
+        <td>${s.SubjectID}</td>
+        <td>${s.SubjectName}</td>
+        <td>${s.TeacherID}</td>
+        <td>
+          <button onclick="deleteSubject(${s.SubjectID})">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+async function deleteSubject(id) {
+
+  await fetch(`${API}/subject/${id}`, {
+    method: "DELETE"
+  });
+
+  loadSectionData();
+}
+
 
 /* ---------------- MARKS ---------------- */
 
@@ -229,29 +228,27 @@ function renderMarks() {
 
   marks.forEach(m => {
 
-    const grade =
-      m.marks >= 90 ? "A" :
-      m.marks >= 75 ? "B" :
-      m.marks >= 60 ? "C" :
-      m.marks >= 40 ? "D" : "F";
-
     body.innerHTML += `
       <tr>
-        <td>${m.student_name}</td>
-        <td>${m.course_name}</td>
-        <td>${m.marks}</td>
-        <td>${grade}</td>
-        <td>${m.marks}%</td>
+        <td>${m.MarkID}</td>
+        <td>${m.StudentID}</td>
+        <td>${m.SubjectID}</td>
+        <td>${m.Score}</td>
         <td>
           <button class="btn btn-danger btn-sm" onclick="deleteMarks(${m.id})">Delete</button>
         </td>
       </tr>
     `;
+  });
+}
 
+async function deleteMarks(id) {
+
+  await fetch(`${API}/marks/${id}`, {
+    method: "DELETE"
   });
 
-  document.getElementById("marks-count").innerText =
-    marks.length + " entries";
+  loadSectionData();
 }
 
 /* ---------------- ATTENDANCE ---------------- */
@@ -378,43 +375,9 @@ function toast(msg) {
 
   setTimeout(() => {
     el.remove();
-  }, 3000);
+  },3000);
 }
 
-/* ---------------- EXPORT CSV ---------------- */
-
-function exportData() {
-
-  let data = [];
-
-  if (currentSection === "students") data = students;
-  if (currentSection === "departments") data = departments;
-  if (currentSection === "courses") data = courses;
-  if (currentSection === "marks") data = marks;
-  if (currentSection === "attendance") data = attendance;
-
-  if (!data.length) {
-    toast("No data to export");
-    return;
-  }
-
-  const keys = Object.keys(data[0]);
-
-  const csv =
-    keys.join(",") +
-    "\n" +
-    data.map(row =>
-      keys.map(k => row[k]).join(",")
-    ).join("\n");
-
-  const blob = new Blob([csv]);
-
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = currentSection + ".csv";
-
-  a.click();
-}
 
 /* ---------------- INIT ---------------- */
 
