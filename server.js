@@ -22,7 +22,7 @@ const db = require('./db/connection');
 
 // routers
 const classRouter = require('./routes/class');
-const studentRouter = require('./routes/student');
+const studentRouter = require('./routes/students');
 const teacherRouter = require('./routes/teacher');
 const subjectRouter = require('./routes/subject');
 const marksRouter = require('./routes/marks');
