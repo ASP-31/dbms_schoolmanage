@@ -119,7 +119,7 @@ function renderStudents() {
         <td>${s.avg_marks || "-"}</td>
         <td>${s.attendance || "-"}</td>
         <td>
-          <button onclick="deleteStudent(${s.id})">Delete</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.id})">Delete</button>
         </td>
       </tr>
     `;
@@ -130,6 +130,28 @@ function renderStudents() {
 
   document.getElementById("students-count").innerText =
     students.length + " total";
+}
+
+async function clearSectionData() {
+  if (currentSection === "dashboard") {
+    toast("Cannot clear data directly from dashboard.");
+    return;
+  }
+  if (!confirm(`Are you sure you want to permanently delete ALL data in the ${currentSection} section?`)) return;
+
+  try {
+    const res = await fetch(`${API}/clear/${currentSection}`, {
+      method: "DELETE"
+    });
+    if (res.ok) {
+      toast(`${currentSection} data cleared!`);
+      loadSectionData();
+    } else {
+      toast("Failed to clear data.");
+    }
+  } catch (err) {
+    toast("Error clearing data");
+  }
 }
 
 async function deleteStudent(id) {
@@ -159,7 +181,7 @@ function renderDepartments() {
         <td>${d.courses || 0}</td>
         <td>${d.students || 0}</td>
         <td>
-          <button onclick="deleteDepartment(${d.id})">Delete</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteDepartment(${d.id})">Delete</button>
         </td>
       </tr>
     `;
@@ -187,7 +209,7 @@ function renderCourses() {
         <td>${c.enrolled || 0}</td>
         <td>${c.avg_score || "-"}</td>
         <td>
-          <button onclick="deleteCourse(${c.id})">Delete</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCourse(${c.id})">Delete</button>
         </td>
       </tr>
     `;
@@ -221,7 +243,7 @@ function renderMarks() {
         <td>${grade}</td>
         <td>${m.marks}%</td>
         <td>
-          <button onclick="deleteMarks(${m.id})">Delete</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMarks(${m.id})">Delete</button>
         </td>
       </tr>
     `;
@@ -247,7 +269,7 @@ function renderAttendance() {
         <td>${a.attended_date}</td>
         <td>${a.status}</td>
         <td>
-          <button onclick="deleteAttendance(${a.id})">Delete</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteAttendance(${a.id})">Delete</button>
         </td>
       </tr>
     `;
@@ -261,18 +283,81 @@ function renderAttendance() {
 /* ---------------- MODAL ---------------- */
 
 function openAddModal() {
-
   const body = document.getElementById("modalBody");
 
+  let sectionSelectHtml = '';
+  let targetName = currentSection.charAt(0).toUpperCase() + currentSection.slice(1);
+  
+  if (currentSection === "dashboard") {
+    targetName = "Selected Section";
+    sectionSelectHtml = `
+      <div style="margin-bottom: 1rem;">
+        <label style="display:block; margin-bottom:0.5rem; font-weight: 500;">Select Section to Upload to</label>
+        <select id="uploadSectionSelect" class="form-control" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;">
+          <option value="students">Students</option>
+          <option value="departments">Departments</option>
+          <option value="courses">Courses</option>
+          <option value="attendance">Attendance</option>
+          <option value="marks">Marks</option>
+        </select>
+      </div>
+    `;
+  }
+
   body.innerHTML = `
-    <p>Form for ${currentSection} will go here</p>
+    ${sectionSelectHtml}
+    <div style="margin-bottom: 1.5rem;">
+      <label style="display:block; margin-bottom:0.5rem; font-weight: 500;">
+        Upload CSV Data for ${targetName}
+      </label>
+      <input type="file" id="csvFileInput" accept=".csv" class="form-control" style="width: 100%; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px;" />
+    </div>
+    <button class="btn btn-primary" onclick="uploadCSV()" style="width: 100%;">Upload CSV</button>
+    <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid #eee;" />
+    <p style="font-size: 0.85em; color: #666; margin-top: 0.5rem;">Make sure your CSV header matches the database fields.</p>
   `;
 
-  document.getElementById("modalBackdrop").style.display = "flex";
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function uploadCSV() {
+  const fileInput = document.getElementById("csvFileInput");
+  if (!fileInput || !fileInput.files.length) {
+    toast("Please select a file to upload.");
+    return;
+  }
+  
+  let targetSection = currentSection;
+  if (currentSection === "dashboard") {
+    const select = document.getElementById("uploadSectionSelect");
+    if(select) targetSection = select.value;
+  }
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    const res = await fetch(`${API}/upload/${targetSection}`, {
+      method: "POST",
+      body: formData
+    });
+
+    if (res.ok) {
+      toast("CSV uploaded successfully");
+      closeModal();
+      loadSectionData();
+    } else {
+      const data = await res.json();
+      toast(data.error || "Upload failed");
+    }
+  } catch (err) {
+    toast("Error uploading CSV");
+  }
 }
 
 function closeModal() {
-  document.getElementById("modalBackdrop").style.display = "none";
+  document.getElementById("modalBackdrop").classList.remove("open");
 }
 
 function closeModalOnBackdrop(e) {

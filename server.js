@@ -43,6 +43,11 @@ app.use('/api/departments', departmentsRouter);
 app.use('/api/courses', coursesRouter);
 app.use('/api/attendance', attendanceRouter);
 app.use('/api/marks', marksRouter);
+const multer = require("multer");
+const csv = require("csv-parser");
+
+// store uploaded files
+const upload = multer({ dest: "uploads/" });
 
 // simple health check
 app.get("/", (req, res) => {
@@ -135,5 +140,75 @@ async function initializeSchema() {
     process.exit(1);
   }
 }
+app.post("/api/upload/:section", upload.single("file"), (req, res) => {
+  const section = req.params.section;
+  const validSections = ["students", "departments", "courses", "attendance", "marks"];
+  
+  if (!validSections.includes(section)) {
+    return res.status(400).json({ error: "Invalid section" });
+  }
+
+  const results = [];
+
+  fs.createReadStream(req.file.path)
+    .pipe(csv())
+    .on("data", (data) => results.push(data))
+    .on("end", async () => {
+      try {
+        for (const row of results) {
+          if (section === "students") {
+            await db.query(
+              `INSERT INTO students (first_name, last_name, department_id, year, dob) VALUES (?, ?, ?, ?, ?)`,
+              [row.first_name, row.last_name, row.department_id || null, row.year || null, row.dob || null]
+            );
+          } else if (section === "departments") {
+            await db.query(
+              `INSERT INTO departments (name) VALUES (?)`,
+              [row.name]
+            );
+          } else if (section === "courses") {
+            await db.query(
+              `INSERT INTO courses (name, department_id, credits) VALUES (?, ?, ?)`,
+              [row.name, row.department_id || null, row.credits || 3]
+            );
+          } else if (section === "attendance") {
+            await db.query(
+              `INSERT INTO attendance (student_id, course_id, attended_date, status) VALUES (?, ?, ?, ?)`,
+              [row.student_id, row.course_id || null, row.attended_date, row.status || 'present']
+            );
+          } else if (section === "marks") {
+            await db.query(
+              `INSERT INTO marks (student_id, course_id, marks, term) VALUES (?, ?, ?, ?)`,
+              [row.student_id, row.course_id, row.marks, row.term || null]
+            );
+          }
+        }
+        res.json({ message: "CSV uploaded successfully" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Upload failed" });
+      } finally {
+        fs.unlink(req.file.path, (e) => {}); // clean up uploaded file
+      }
+    });
+});
+app.delete("/api/clear/:section", async (req, res) => {
+  const section = req.params.section;
+  const validSections = ["students", "departments", "courses", "attendance", "marks"];
+  
+  if (!validSections.includes(section)) {
+    return res.status(400).json({ error: "Invalid section" });
+  }
+
+  try {
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.query(`TRUNCATE TABLE ${section}`);
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    res.json({ message: `${section} data cleared successfully` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Clear failed" });
+  }
+});
 
 startServer();

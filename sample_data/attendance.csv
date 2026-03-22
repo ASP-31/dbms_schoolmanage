@@ -1,0 +1,3 @@
+student_id,course_id,attended_date,status
+1,1,2023-10-01,present
+2,2,2023-10-01,absent
