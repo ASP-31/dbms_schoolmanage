@@ -5,24 +5,22 @@ const db = require('../db/connection');
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT d.*, 
-        (SELECT COUNT(*) FROM courses c WHERE c.department_id = d.id) as courses,
-        (SELECT COUNT(*) FROM students s WHERE s.department_id = d.id) as students
-      FROM departments d
+      SELECT s.*, c.class_name as class_name,
+      CAST((SELECT AVG(score) FROM marks m WHERE m.student_id = s.id) AS UNSIGNED) as avg_score
+      FROM student s
+      LEFT JOIN class c ON s.class_id = c.id
     `);
     res.json(rows);
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to fetch departments' });
+    res.status(500).json({ error: 'Failed to fetch' });
   }
 });
 
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM departments WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM student WHERE id = ?', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ error: 'Failed to delete' });
   }
 });

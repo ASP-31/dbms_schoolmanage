@@ -1,3 +1,9 @@
-student_id,course_id,marks,term
-1,1,85,Fall 2023
-2,2,92,Fall 2023
+student_id,subject_id,score
+1,4,88
+1,5,92
+2,1,75
+2,2,80
+3,1,95
+3,4,82
+4,3,91
+5,1,89

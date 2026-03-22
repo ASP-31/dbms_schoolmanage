@@ -5,12 +5,9 @@ const db = require('../db/connection');
 router.get('/', async (req, res) => {
   try {
     const [rows] = await db.query(`
-      SELECT m.*, 
-        s.name as student_name,
-        sub.subject_name as subject_name
-      FROM marks m
-      LEFT JOIN student s ON m.student_id = s.id
-      LEFT JOIN subject sub ON m.subject_id = sub.id
+      SELECT s.*, t.name as teacher_name
+      FROM subject s
+      LEFT JOIN teacher t ON s.teacher_id = t.id
     `);
     res.json(rows);
   } catch (err) {
@@ -20,7 +17,7 @@ router.get('/', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   try {
-    await db.query('DELETE FROM marks WHERE id = ?', [req.params.id]);
+    await db.query('DELETE FROM subject WHERE id = ?', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ error: 'Failed to delete' });

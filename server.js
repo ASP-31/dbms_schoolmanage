@@ -17,14 +17,14 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 
-// database connection (pool or client)
+// database connection
 const db = require('./db/connection');
 
 // routers
-const studentsRouter = require('./routes/students');
-const departmentsRouter = require('./routes/departments');
-const coursesRouter = require('./routes/courses');
-const attendanceRouter = require('./routes/attendance');
+const classRouter = require('./routes/class');
+const studentRouter = require('./routes/student');
+const teacherRouter = require('./routes/teacher');
+const subjectRouter = require('./routes/subject');
 const marksRouter = require('./routes/marks');
 
 const app = express();
@@ -38,11 +38,12 @@ const path = require("path");
 
 app.use(express.static(path.join(__dirname, )));
 // mount route handlers
-app.use('/api/students', studentsRouter);
-app.use('/api/departments', departmentsRouter);
-app.use('/api/courses', coursesRouter);
-app.use('/api/attendance', attendanceRouter);
+app.use('/api/class', classRouter);
+app.use('/api/student', studentRouter);
+app.use('/api/teacher', teacherRouter);
+app.use('/api/subject', subjectRouter);
 app.use('/api/marks', marksRouter);
+
 const multer = require("multer");
 const csv = require("csv-parser");
 
@@ -57,18 +58,15 @@ app.get("/", (req, res) => {
 // start server after ensuring database connectivity
 async function startServer() {
   try {
-    // promise pool returns [rows, fields] but we only need to execute a simple check
     await db.query('SELECT 1');
     console.log('Database connection successful.');
 
-    // check if schema already exists by looking for the departments table
     const [tables] = await db.query(
-      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'departments'",
+      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'class'",
       [process.env.DB_NAME || 'school']
     );
 
     if (tables.length === 0) {
-      // schema does not exist; create it
       console.log('Schema not found. Creating schema...');
       await initializeSchema();
     } else {
@@ -84,50 +82,36 @@ async function startServer() {
 
 async function initializeSchema() {
   try {
-    // Create tables without DROP statements (idempotent)
     const queries = [
-      `CREATE TABLE IF NOT EXISTS departments (
+      `CREATE TABLE IF NOT EXISTS class (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL UNIQUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        class_name VARCHAR(100) NOT NULL UNIQUE
       )`,
-      `CREATE TABLE IF NOT EXISTS students (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        first_name VARCHAR(50) NOT NULL,
-        last_name VARCHAR(50) NOT NULL,
-        department_id INT,
-        year INT,
-        dob DATE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS courses (
+      `CREATE TABLE IF NOT EXISTS student (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
-        department_id INT,
-        credits INT DEFAULT 3,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL
+        age INT,
+        class_id INT,
+        FOREIGN KEY (class_id) REFERENCES class(id) ON DELETE SET NULL
       )`,
-      `CREATE TABLE IF NOT EXISTS attendance (
+      `CREATE TABLE IF NOT EXISTS teacher (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        student_id INT NOT NULL,
-        course_id INT,
-        attended_date DATE NOT NULL,
-        status ENUM('present','absent','late','excused') DEFAULT 'present',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE SET NULL
+        name VARCHAR(100) NOT NULL,
+        subject VARCHAR(100)
+      )`,
+      `CREATE TABLE IF NOT EXISTS subject (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subject_name VARCHAR(100) NOT NULL,
+        teacher_id INT,
+        FOREIGN KEY (teacher_id) REFERENCES teacher(id) ON DELETE SET NULL
       )`,
       `CREATE TABLE IF NOT EXISTS marks (
         id INT AUTO_INCREMENT PRIMARY KEY,
         student_id INT NOT NULL,
-        course_id INT NOT NULL,
-        marks INT CHECK (marks >= 0 AND marks <= 100),
-        term VARCHAR(20),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-        FOREIGN KEY (course_id) REFERENCES courses(id) ON DELETE CASCADE
+        subject_id INT NOT NULL,
+        score INT NOT NULL,
+        FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subject(id) ON DELETE CASCADE
       )`
     ];
 
@@ -143,7 +127,7 @@ async function initializeSchema() {
 
 app.post("/api/upload/:section", upload.single("file"), (req, res) => {
   const section = req.params.section;
-  const validSections = ["students", "departments", "courses", "attendance", "marks"];
+  const validSections = ["class", "student", "teacher", "subject", "marks"];
   
   if (!validSections.includes(section)) {
     return res.status(400).json({ error: "Invalid section" });
@@ -153,34 +137,40 @@ app.post("/api/upload/:section", upload.single("file"), (req, res) => {
 
   fs.createReadStream(req.file.path)
     .pipe(csv())
+    .on('headers', (headers) => {
+      // Strip BOM from first header if present just to be absolutely safe
+      if (headers.length > 0 && headers[0].charCodeAt(0) === 0xFEFF) {
+        headers[0] = headers[0].substring(1);
+      }
+    })
     .on("data", (data) => results.push(data))
     .on("end", async () => {
       try {
         for (const row of results) {
-          if (section === "students") {
+          if (section === "class") {
             await db.query(
-              `INSERT INTO students (first_name, last_name, department_id, year, dob) VALUES (?, ?, ?, ?, ?)`,
-              [row.first_name, row.last_name, row.department_id || null, row.year || null, row.dob || null]
+              `INSERT INTO class (class_name) VALUES (?)`,
+              [row.class_name]
             );
-          } else if (section === "departments") {
+          } else if (section === "student") {
             await db.query(
-              `INSERT INTO departments (name) VALUES (?)`,
-              [row.name]
+              `INSERT INTO student (name, age, class_id) VALUES (?, ?, ?)`,
+              [row.name, row.age || null, row.class_id || null]
             );
-          } else if (section === "courses") {
+          } else if (section === "teacher") {
             await db.query(
-              `INSERT INTO courses (name, department_id, credits) VALUES (?, ?, ?)`,
-              [row.name, row.department_id || null, row.credits || 3]
+              `INSERT INTO teacher (name, subject) VALUES (?, ?)`,
+              [row.name, row.subject || null]
             );
-          } else if (section === "attendance") {
+          } else if (section === "subject") {
             await db.query(
-              `INSERT INTO attendance (student_id, course_id, attended_date, status) VALUES (?, ?, ?, ?)`,
-              [row.student_id, row.course_id || null, row.attended_date, row.status || 'present']
+              `INSERT INTO subject (subject_name, teacher_id) VALUES (?, ?)`,
+              [row.subject_name, row.teacher_id || null]
             );
           } else if (section === "marks") {
             await db.query(
-              `INSERT INTO marks (student_id, course_id, marks, term) VALUES (?, ?, ?, ?)`,
-              [row.student_id, row.course_id, row.marks, row.term || null]
+              `INSERT INTO marks (student_id, subject_id, score) VALUES (?, ?, ?)`,
+              [row.student_id, row.subject_id, row.score || 0]
             );
           }
         }
@@ -189,14 +179,14 @@ app.post("/api/upload/:section", upload.single("file"), (req, res) => {
         console.error(err);
         res.status(500).json({ error: "Upload failed" });
       } finally {
-        fs.unlink(req.file.path, (e) => {}); // clean up uploaded file
+        fs.unlink(req.file.path, (e) => {}); // clean up
       }
     });
 });
 
 app.delete("/api/clear/:section", async (req, res) => {
   const section = req.params.section;
-  const validSections = ["students", "departments", "courses", "attendance", "marks"];
+  const validSections = ["class", "student", "teacher", "subject", "marks"];
   
   if (!validSections.includes(section)) {
     return res.status(400).json({ error: "Invalid section" });

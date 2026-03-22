@@ -21,23 +21,23 @@
     </div>
 
     <div class="nav-label" style="margin-top:12px">Records</div>
-    <div class="nav-item" onclick="navigate('students')">
-      <span class="nav-icon">👨‍🎓</span> Students
+    <div class="nav-item" onclick="navigate('class')">
+      <span class="nav-icon">🏛️</span> Classes
     </div>
-    <div class="nav-item" onclick="navigate('classes')">
-      <span class="nav-icon">🏫</span> Classes
-    </div>
-    <div class="nav-item" onclick="navigate('teachers')">
+    <div class="nav-item" onclick="navigate('teacher')">
       <span class="nav-icon">👨‍🏫</span> Teachers
     </div>
-    <div class="nav-item" onclick="navigate('subjects')">
+    <div class="nav-item" onclick="navigate('subject')">
       <span class="nav-icon">📚</span> Subjects
+    </div>
+    <div class="nav-item" onclick="navigate('student')">
+      <span class="nav-icon">👨‍🎓</span> Students
     </div>
     <div class="nav-item" onclick="navigate('marks')">
       <span class="nav-icon">📝</span> Marks
     </div>
   </nav>
-  <div class="sidebar-footer">Person 3 &amp; 4 — Frontend</div>
+  <div class="sidebar-footer">Person 3 & 4 — Frontend</div>
 </aside>
 
 <!-- ===== MAIN ===== -->
@@ -53,20 +53,20 @@
 
   <div class="content">
 
-    <!-- ===== DASHBOARD ===== -->
+    <!-- ===== DASHBOARD SECTION ===== -->
     <div id="section-dashboard" class="section active">
       <div class="stats-grid">
+        <div class="stat-card purple">
+          <div class="stat-icon">🏛️</div>
+          <div class="stat-value" id="stat-classes">0</div>
+          <div class="stat-label">Classes</div>
+        </div>
         <div class="stat-card blue">
           <div class="stat-icon">👨‍🎓</div>
           <div class="stat-value" id="stat-students">0</div>
           <div class="stat-label">Total Students</div>
         </div>
         <div class="stat-card green">
-          <div class="stat-icon">🏫</div>
-          <div class="stat-value" id="stat-classes">0</div>
-          <div class="stat-label">Classes</div>
-        </div>
-        <div class="stat-card purple">
           <div class="stat-icon">👨‍🏫</div>
           <div class="stat-value" id="stat-teachers">0</div>
           <div class="stat-label">Teachers</div>
@@ -83,7 +83,7 @@
           <div class="card-header"><span class="card-title">Recent Students</span></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Name</th><th>Age</th><th>Class</th></tr></thead>
+              <thead><tr><th>Name</th><th>Class</th><th>Age</th></tr></thead>
               <tbody id="dash-students-body"></tbody>
             </table>
           </div>
@@ -92,7 +92,7 @@
           <div class="card-header"><span class="card-title">Top Performers</span></div>
           <div class="table-wrap">
             <table>
-              <thead><tr><th>Student</th><th>Subject</th><th>Score</th></tr></thead>
+              <thead><tr><th>Student</th><th>Subject</th><th>Marks</th></tr></thead>
               <tbody id="dash-marks-body"></tbody>
             </table>
           </div>
@@ -100,116 +100,103 @@
       </div>
     </div>
 
-    <!-- ===== STUDENTS ===== -->
-    <div id="section-students" class="section">
-      <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search by name or class..." oninput="filterStudents(this.value)">
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-header">
-          <span class="card-title">All Students</span>
-          <span class="badge badge-blue" id="students-count">0 total</span>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th><th>Name</th><th>Age</th><th>Class</th><th>Avg Score</th><th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="students-body"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== CLASSES ===== -->
-    <div id="section-classes" class="section">
+    <!-- ===== CLASSES SECTION ===== -->
+    <div id="section-class" class="section">
       <div class="card">
         <div class="card-header">
           <span class="card-title">Classes</span>
-          <span class="badge badge-green" id="classes-count">0 total</span>
+          <span class="badge badge-purple" id="class-count">0 total</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Class Name</th><th>Students</th><th>Actions</th>
+                <th>ID</th><th>Class Name</th>
+                <th>Students Enrolled</th><th>Actions</th>
               </tr>
             </thead>
-            <tbody id="classes-body"></tbody>
+            <tbody id="class-body"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ===== TEACHERS ===== -->
-    <div id="section-teachers" class="section">
-      <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search by name or subject..." oninput="filterTeachers(this.value)">
-        </div>
-      </div>
+    <!-- ===== TEACHERS SECTION ===== -->
+    <div id="section-teacher" class="section">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">All Teachers</span>
-          <span class="badge badge-purple" id="teachers-count">0 total</span>
+          <span class="card-title">Teachers</span>
+          <span class="badge badge-green" id="teacher-count">0 total</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Name</th><th>Subject</th><th>Classes Taught</th><th>Actions</th>
+                <th>ID</th><th>Name</th>
+                <th>Subject Area</th><th>Subjects Teaching</th><th>Actions</th>
               </tr>
             </thead>
-            <tbody id="teachers-body"></tbody>
+            <tbody id="teacher-body"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ===== SUBJECTS ===== -->
-    <div id="section-subjects" class="section">
+    <!-- ===== SUBJECTS SECTION ===== -->
+    <div id="section-subject" class="section">
       <div class="card">
         <div class="card-header">
           <span class="card-title">Subjects</span>
-          <span class="badge badge-yellow" id="subjects-count">0 total</span>
+          <span class="badge badge-yellow" id="subject-count">0 total</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>ID</th><th>Subject Name</th><th>Teacher</th><th>Avg Score</th><th>Actions</th>
+                <th>ID</th><th>Subject Name</th><th>Taught By</th>
+                <th>Actions</th>
               </tr>
             </thead>
-            <tbody id="subjects-body"></tbody>
+            <tbody id="subject-body"></tbody>
           </table>
         </div>
       </div>
     </div>
 
-    <!-- ===== MARKS ===== -->
-    <div id="section-marks" class="section">
-      <div class="search-bar">
-        <div class="search-input-wrap">
-          <span class="search-icon">🔍</span>
-          <input type="text" placeholder="Search by student or subject..." oninput="filterMarks(this.value)">
-        </div>
-      </div>
+    <!-- ===== STUDENTS SECTION ===== -->
+    <div id="section-student" class="section">
       <div class="card">
         <div class="card-header">
-          <span class="card-title">Marks Record</span>
-          <span class="badge badge-blue" id="marks-count">0 entries</span>
+          <span class="card-title">All Students</span>
+          <span class="badge badge-blue" id="student-count">0 total</span>
         </div>
         <div class="table-wrap">
           <table>
             <thead>
               <tr>
-                <th>Mark ID</th><th>Student</th><th>Subject</th><th>Score</th><th>Grade</th><th>Progress</th><th>Actions</th>
+                <th>ID</th><th>Name</th><th>Age</th>
+                <th>Class Name</th><th>Avg Marks</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="student-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MARKS SECTION ===== -->
+    <div id="section-marks" class="section">
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">Marks Record</span>
+          <span class="badge badge-yellow" id="marks-count">0 entries</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Student</th><th>Subject</th><th>Marks</th>
+                <th>Grade</th><th>Actions</th>
               </tr>
             </thead>
             <tbody id="marks-body"></tbody>
@@ -236,7 +223,7 @@
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- ===== SCRIPT ===== -->
-<script src="script.js?v=5"></script>
+<script src="script.js?v=6"></script>
 
 </body>
 </html>
