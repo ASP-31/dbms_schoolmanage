@@ -1,330 +1,206 @@
+// basic Express server for school management system
+
+// load environment variables from .env; fall back to .env.example when the primary file doesn't exist
 const fs = require('fs');
-const path = require('path');
+const dotenv = require('dotenv');
 
-// MANUALLY READ AND PARSE .ENV FILE
-const envPath = path.join(__dirname, '.env');
-console.log('Reading .env from:', envPath);
-
-try {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    console.log('✅ .env file found and read');
-    
-    // Parse the .env content
-    envContent.split('\n').forEach(line => {
-        line = line.trim();
-        if (line && !line.startsWith('#')) {
-            const firstEqual = line.indexOf('=');
-            if (firstEqual > 0) {
-                const key = line.substring(0, firstEqual).trim();
-                const value = line.substring(firstEqual + 1).trim();
-                process.env[key] = value;
-                console.log(`Set ${key}=${key.includes('PASSWORD') ? '******' : value}`);
-            }
-        }
-    });
-} catch (err) {
-    console.error('❌ Could not read .env file:', err.message);
-    process.exit(1);
+if (fs.existsSync('.env')) {
+  dotenv.config(); // load real environment settings
+} else if (fs.existsSync('.env.example')) {
+  console.warn('WARNING: .env not found, loading variables from .env.example');
+  dotenv.config({ path: '.env.example' });
+} else {
+  console.warn('No environment file found; relying entirely on process environment');
 }
 
-const express = require("express");
-const mysql = require("mysql2");
-const cors = require("cors");
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+
+// database connection
+const db = require('./db/connection');
+
+// routers
+const classRouter = require('./routes/class');
+const studentRouter = require('./routes/students');
+const teacherRouter = require('./routes/teacher');
+const subjectRouter = require('./routes/subject');
+const marksRouter = require('./routes/marks');
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// middleware
 app.use(cors());
-app.use(express.json());
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
+const path = require("path");
 
-// Debug: Confirm env vars are set
-console.log('\n=== DATABASE CONFIGURATION ===');
-console.log('DB_HOST:', process.env.DB_HOST);
-console.log('DB_USER:', process.env.DB_USER);
-console.log('DB_NAME:', process.env.DB_NAME);
-console.log('==============================\n');
+app.use(express.static(path.join(__dirname, )));
+// mount route handlers
+app.use('/api/class', classRouter);
+app.use('/api/student', studentRouter);
+app.use('/api/teacher', teacherRouter);
+app.use('/api/subject', subjectRouter);
+app.use('/api/marks', marksRouter);
 
-// DATABASE CONNECTION USING ENV VARIABLES
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
+const multer = require("multer");
+const csv = require("csv-parser");
+
+// store uploaded files
+const upload = multer({ dest: "uploads/" });
+
+// simple health check
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
-db.connect(err => {
-    if(err) {
-        console.log("❌ Database connection failed");
-        console.log("Error code:", err.code);
-        console.log("Error message:", err.message);
+// start server after ensuring database connectivity
+async function startServer() {
+  try {
+    await db.query('SELECT 1');
+    console.log('Database connection successful.');
+
+    const [tables] = await db.query(
+      "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'class'",
+      [process.env.DB_NAME || 'school']
+    );
+
+    if (tables.length === 0) {
+      console.log('Schema not found. Creating schema...');
+      await initializeSchema();
     } else {
-        console.log("✅ Connected to MySQL");
+      console.log('Schema already exists. Accessing database...');
     }
-});
+  } catch (err) {
+    console.error('Unable to reach database:', err);
+    process.exit(1);
+  }
 
-// Test route
-app.get("/test", (req, res) => {
-    res.json({ message: "Server is working!" });
-});
+  app.listen(PORT, () => console.log(`Server running at http://localhost:${PORT}`));
+}
 
-// Test database route
-app.get("/test-db", (req, res) => {
-    db.query("SELECT 1 + 1 AS solution", (err, result) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-        } else {
-            res.json({ message: "Database working!", result: result[0].solution });
+async function initializeSchema() {
+  try {
+    const queries = [
+      `CREATE TABLE IF NOT EXISTS class (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        class_name VARCHAR(100) NOT NULL UNIQUE
+      )`,
+      `CREATE TABLE IF NOT EXISTS student (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        age INT,
+        class_id INT,
+        FOREIGN KEY (class_id) REFERENCES class(id) ON DELETE SET NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS teacher (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        subject VARCHAR(100)
+      )`,
+      `CREATE TABLE IF NOT EXISTS subject (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        subject_name VARCHAR(100) NOT NULL,
+        teacher_id INT,
+        FOREIGN KEY (teacher_id) REFERENCES teacher(id) ON DELETE SET NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS marks (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        student_id INT NOT NULL,
+        subject_id INT NOT NULL,
+        score INT NOT NULL,
+        FOREIGN KEY (student_id) REFERENCES student(id) ON DELETE CASCADE,
+        FOREIGN KEY (subject_id) REFERENCES subject(id) ON DELETE CASCADE
+      )`
+    ];
+
+    for (const query of queries) {
+      await db.query(query);
+    }
+    console.log('Schema created successfully.');
+  } catch (err) {
+    console.error('Error initializing schema:', err);
+    process.exit(1);
+  }
+}
+
+app.post("/api/upload/:section", upload.single("file"), (req, res) => {
+  const section = req.params.section;
+  const validSections = ["class", "student", "teacher", "subject", "marks"];
+  
+  if (!validSections.includes(section)) {
+    return res.status(400).json({ error: "Invalid section" });
+  }
+
+  const results = [];
+
+  fs.createReadStream(req.file.path)
+    .pipe(csv())
+    .on('headers', (headers) => {
+      // Strip BOM from first header if present just to be absolutely safe
+      if (headers.length > 0 && headers[0].charCodeAt(0) === 0xFEFF) {
+        headers[0] = headers[0].substring(1);
+      }
+    })
+    .on("data", (data) => results.push(data))
+    .on("end", async () => {
+      try {
+        for (const row of results) {
+          if (section === "class") {
+            await db.query(
+              `INSERT INTO class (class_name) VALUES (?)`,
+              [row.class_name]
+            );
+          } else if (section === "student") {
+            await db.query(
+              `INSERT INTO student (name, age, class_id) VALUES (?, ?, ?)`,
+              [row.name, row.age || null, row.class_id || null]
+            );
+          } else if (section === "teacher") {
+            await db.query(
+              `INSERT INTO teacher (name, subject) VALUES (?, ?)`,
+              [row.name, row.subject || null]
+            );
+          } else if (section === "subject") {
+            await db.query(
+              `INSERT INTO subject (subject_name, teacher_id) VALUES (?, ?)`,
+              [row.subject_name, row.teacher_id || null]
+            );
+          } else if (section === "marks") {
+            await db.query(
+              `INSERT INTO marks (student_id, subject_id, score) VALUES (?, ?, ?)`,
+              [row.student_id, row.subject_id, row.score || 0]
+            );
+          }
         }
+        res.json({ message: "CSV uploaded successfully" });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Upload failed" });
+      } finally {
+        fs.unlink(req.file.path, (e) => {}); // clean up
+      }
     });
 });
 
-/* =========================
-   CLASS ROUTES
-========================= */
-app.get("/api/class", (req, res) => {
-    db.query("SELECT * FROM class", (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(result);
-    });
+app.delete("/api/clear/:section", async (req, res) => {
+  const section = req.params.section;
+  const validSections = ["class", "student", "teacher", "subject", "marks"];
+  
+  if (!validSections.includes(section)) {
+    return res.status(400).json({ error: "Invalid section" });
+  }
+
+  try {
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.query(`TRUNCATE TABLE ${section}`);
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    res.json({ message: `${section} data cleared successfully` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Clear failed" });
+  }
 });
 
-app.post("/api/class", (req, res) => {
-    const { ClassName } = req.body;
-    
-    if (!ClassName) {
-        return res.status(400).json({ error: "ClassName is required" });
-    }
-
-    db.query(
-        "INSERT INTO classes (ClassName) VALUES (?)",
-        [ClassName],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Class added successfully", id: result.insertId });
-        }
-    );
-});
-
-app.delete("/api/class/:id", (req, res) => {
-    const id = req.params.id;
-
-    db.query(
-        "DELETE FROM class WHERE ClassID=?",
-        [id],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Class deleted successfully" });
-        }
-    );
-});
-
-/* =========================
-   STUDENTS ROUTES
-========================= */
-app.get("/api/student", (req, res) => {
-    db.query("SELECT * FROM student", (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(result);
-    });
-});
-
-app.post("/api/student", (req, res) => {
-    const { Name, Age, ClassID } = req.body;
-    
-    if (!Name || !Age || !ClassID) {
-        return res.status(400).json({ error: "Name, Age, and ClassID are required" });
-    }
-
-    db.query(
-        "INSERT INTO student (Name, Age, ClassID) VALUES (?, ?, ?)",
-        [Name, Age, ClassID],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Student added successfully", id: result.insertId });
-        }
-    );
-});
-
-app.delete("/api/student/:id", (req, res) => {
-    const id = req.params.id;
-
-    db.query(
-        "DELETE FROM student WHERE StudentID=?",
-        [id],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Student deleted successfully" });
-        }
-    );
-});
-
-/* =========================
-   TEACHERS ROUTES
-========================= */
-app.get("/api/teacher", (req, res) => {
-    db.query("SELECT * FROM teacher", (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(result);
-    });
-});
-
-app.post("/api/teacher", (req, res) => {
-    const { Name, Subject } = req.body;
-    
-    if (!Name || !Subject) {
-        return res.status(400).json({ error: "Name and Subject are required" });
-    }
-
-    db.query(
-        "INSERT INTO teacher (Name, Subject) VALUES (?, ?)",
-        [Name, Subject],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Teacher added successfully", id: result.insertId });
-        }
-    );
-});
-
-app.delete("/api/teacher/:id", (req, res) => {
-    const id = req.params.id;
-
-    db.query(
-        "DELETE FROM teacher WHERE TeacherID=?",
-        [id],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Teacher deleted successfully" });
-        }
-    );
-});
-
-/* =========================
-   SUBJECTS ROUTES
-========================= */
-app.get("/api/subject", (req, res) => {
-    db.query("SELECT * FROM subject", (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(result);
-    });
-});
-
-app.post("/api/subject", (req, res) => {
-    const { SubjectName, TeacherID } = req.body;
-    
-    if (!SubjectName || !TeacherID) {
-        return res.status(400).json({ error: "SubjectName and TeacherID are required" });
-    }
-
-    db.query(
-        "INSERT INTO subject (SubjectName, TeacherID) VALUES (?, ?)",
-        [SubjectName, TeacherID],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Subject added successfully", id: result.insertId });
-        }
-    );
-});
-
-app.delete("/api/subject/:id", (req, res) => {
-    const id = req.params.id;
-
-    db.query(
-        "DELETE FROM subject WHERE SubjectID=?",
-        [id],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Subject deleted successfully" });
-        }
-    );
-});
-
-/* =========================
-   MARKS ROUTES
-========================= */
-app.get("/api/marks", (req, res) => {
-    db.query("SELECT * FROM marks", (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).json({ error: err.message });
-        }
-        res.json(result);
-    });
-});
-
-app.post("/api/marks", (req, res) => {
-    const { StudentID, SubjectID, Score } = req.body;
-    
-    if (!StudentID || !SubjectID || !Score) {
-        return res.status(400).json({ error: "StudentID, SubjectID, and Score are required" });
-    }
-
-    db.query(
-        "INSERT INTO marks (StudentID, SubjectID, Score) VALUES (?, ?, ?)",
-        [StudentID, SubjectID, Score],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Marks added successfully", id: result.insertId });
-        }
-    );
-});
-
-app.delete("/api/marks/:id", (req, res) => {
-    const id = req.params.id;
-
-    db.query(
-        "DELETE FROM marks WHERE MarkID=?",
-        [id],
-        (err, result) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({ error: err.message });
-            }
-            res.json({ message: "Marks deleted successfully" });
-        }
-    );
-});
-
-/* START SERVER */
-const PORT = 3000;
-app.listen(PORT, () => {
-    console.log(`\n✅ Server running on port ${PORT}`);
-    console.log(`📝 Test server: http://localhost:${PORT}/test`);
-    console.log(`📝 Test database: http://localhost:${PORT}/test-db`);
-});
+startServer();
