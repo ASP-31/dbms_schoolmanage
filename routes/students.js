@@ -16,6 +16,16 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.put('/:id', async (req, res) => {
+  const { name, age, class_id } = req.body;
+  try {
+    await db.query('UPDATE student SET name = ?, age = ?, class_id = ? WHERE id = ?', [name, age || null, class_id || null, req.params.id]);
+    res.json({ message: 'Updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
 router.delete('/:id', async (req, res) => {
   try {
     await db.query('DELETE FROM student WHERE id = ?', [req.params.id]);

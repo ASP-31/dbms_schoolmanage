@@ -13,7 +13,7 @@ let marksData = [];
 function navigate(section) {
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
   const sectionEl = document.getElementById(`section-${section}`);
-  if(sectionEl) sectionEl.classList.add("active");
+  if (sectionEl) sectionEl.classList.add("active");
 
   document.querySelectorAll(".nav-item").forEach(i => i.classList.remove("active"));
   if (event && event.target) {
@@ -22,9 +22,7 @@ function navigate(section) {
   }
 
   currentSection = section;
-
   document.getElementById("pageTitle").innerText = section.charAt(0).toUpperCase() + section.slice(1);
-
   loadSectionData();
 }
 
@@ -69,27 +67,27 @@ async function loadSectionData() {
 
 async function loadDashboard() {
   try {
-    const c = await fetch(`${API}/class`).then(r => r.json());
-    const s = await fetch(`${API}/student`).then(r => r.json());
-    const t = await fetch(`${API}/teacher`).then(r => r.json());
+    const c   = await fetch(`${API}/class`).then(r => r.json());
+    const s   = await fetch(`${API}/student`).then(r => r.json());
+    const t   = await fetch(`${API}/teacher`).then(r => r.json());
     const sub = await fetch(`${API}/subject`).then(r => r.json());
 
-    document.getElementById("stat-classes").innerText = c.length || 0;
-    document.getElementById("stat-students").innerText = s.length || 0;
-    document.getElementById("stat-teachers").innerText = t.length || 0;
-    document.getElementById("stat-subjects").innerText = sub.length || 0;
+    document.getElementById("stat-classes").innerText  = Array.isArray(c)   ? c.length   : 0;
+    document.getElementById("stat-students").innerText = Array.isArray(s)   ? s.length   : 0;
+    document.getElementById("stat-teachers").innerText = Array.isArray(t)   ? t.length   : 0;
+    document.getElementById("stat-subjects").innerText = Array.isArray(sub) ? sub.length : 0;
 
-    // Render tiny recent tables
     const dashStudents = document.getElementById("dash-students-body");
-    dashStudents.innerHTML = s.slice(-5).map(x => `
-      <tr>
-        <td>${x.name || "-"}</td>
-        <td>${x.class_name || "-"}</td>
-        <td>${x.age || "-"}</td>
-      </tr>
-    `).join("");
-
-  } catch(e) {
+    if (dashStudents && Array.isArray(s)) {
+      dashStudents.innerHTML = s.slice(-5).map(x => `
+        <tr>
+          <td>${x.name || "-"}</td>
+          <td>${x.class_name || "-"}</td>
+          <td>${x.age || "-"}</td>
+        </tr>
+      `).join("");
+    }
+  } catch (e) {
     console.error(e);
   }
 }
@@ -104,6 +102,7 @@ function renderClasses() {
       <td>${c.class_name}</td>
       <td>${c.students || 0}</td>
       <td>
+        <button class="btn btn-warning btn-sm" onclick="openEditModal('class', ${c.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecord('class', ${c.id})">Delete</button>
       </td>
     </tr>
@@ -120,6 +119,7 @@ function renderTeachers() {
       <td>${t.subject || "-"}</td>
       <td>${t.subjects || 0}</td>
       <td>
+        <button class="btn btn-warning btn-sm" onclick="openEditModal('teacher', ${t.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecord('teacher', ${t.id})">Delete</button>
       </td>
     </tr>
@@ -135,6 +135,7 @@ function renderSubjects() {
       <td>${s.subject_name}</td>
       <td>${s.teacher_name || "-"}</td>
       <td>
+        <button class="btn btn-warning btn-sm" onclick="openEditModal('subject', ${s.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecord('subject', ${s.id})">Delete</button>
       </td>
     </tr>
@@ -152,6 +153,7 @@ function renderStudents() {
       <td>${s.class_name || "-"}</td>
       <td>${s.avg_score || "-"}</td>
       <td>
+        <button class="btn btn-warning btn-sm" onclick="openEditModal('student', ${s.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecord('student', ${s.id})">Delete</button>
       </td>
     </tr>
@@ -170,6 +172,7 @@ function renderMarks() {
       <td>${m.score}</td>
       <td>${grade}</td>
       <td>
+        <button class="btn btn-warning btn-sm" onclick="openEditModal('marks', ${m.id})">Edit</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecord('marks', ${m.id})">Delete</button>
       </td>
     </tr>
@@ -177,7 +180,153 @@ function renderMarks() {
   document.getElementById("marks-count").innerText = marksData.length + " entries";
 }
 
-/* ---------------- ACTIONS & CLEAR ---------------- */
+/* ---------------- EDIT MODAL ---------------- */
+
+async function openEditModal(section, id) {
+  // Ensure related data is loaded before building dropdowns
+  if (section === "marks") {
+    if (!studentData.length) {
+      const res = await fetch(`${API}/student`);
+      studentData = await res.json();
+    }
+    if (!subjectData.length) {
+      const res = await fetch(`${API}/subject`);
+      subjectData = await res.json();
+    }
+  }
+  if (section === "subject" && !teacherData.length) {
+    const res = await fetch(`${API}/teacher`);
+    teacherData = await res.json();
+  }
+  if (section === "student" && !classData.length) {
+    const res = await fetch(`${API}/class`);
+    classData = await res.json();
+  }
+
+  const modalTitle = document.getElementById("modalTitle");
+  const body = document.getElementById("modalBody");
+  modalTitle.innerText = `Edit ${section.charAt(0).toUpperCase() + section.slice(1)}`;
+
+  let record, fields;
+
+  if (section === "class") {
+    record = classData.find(r => r.id === id);
+    fields = `
+      <label>Class Name</label>
+      <input class="form-control" id="edit-class_name" value="${record.class_name}" />
+    `;
+  } else if (section === "teacher") {
+    record = teacherData.find(r => r.id === id);
+    fields = `
+      <label>Name</label>
+      <input class="form-control" id="edit-name" value="${record.name}" />
+      <label style="margin-top:0.75rem;">Subject</label>
+      <input class="form-control" id="edit-subject" value="${record.subject || ""}" />
+    `;
+  } else if (section === "subject") {
+    record = subjectData.find(r => r.id === id);
+    const teacherOptions = teacherData.map(t =>
+      `<option value="${t.id}" ${t.id === record.teacher_id ? "selected" : ""}>${t.name}</option>`
+    ).join("");
+    fields = `
+      <label>Subject Name</label>
+      <input class="form-control" id="edit-subject_name" value="${record.subject_name}" />
+      <label style="margin-top:0.75rem;">Teacher</label>
+      <select class="form-control" id="edit-teacher_id">
+        <option value="">-- None --</option>
+        ${teacherOptions}
+      </select>
+    `;
+  } else if (section === "student") {
+    record = studentData.find(r => r.id === id);
+    const classOptions = classData.map(c =>
+      `<option value="${c.id}" ${c.id === record.class_id ? "selected" : ""}>${c.class_name}</option>`
+    ).join("");
+    fields = `
+      <label>Name</label>
+      <input class="form-control" id="edit-name" value="${record.name}" />
+      <label style="margin-top:0.75rem;">Age</label>
+      <input class="form-control" id="edit-age" type="number" value="${record.age || ""}" />
+      <label style="margin-top:0.75rem;">Class</label>
+      <select class="form-control" id="edit-class_id">
+        <option value="">-- None --</option>
+        ${classOptions}
+      </select>
+    `;
+  } else if (section === "marks") {
+    record = marksData.find(r => r.id === id);
+    const studentOptions = studentData.map(s =>
+      `<option value="${s.id}" ${s.id === record.student_id ? "selected" : ""}>${s.name}</option>`
+    ).join("");
+    const subjectOptions = subjectData.map(s =>
+      `<option value="${s.id}" ${s.id === record.subject_id ? "selected" : ""}>${s.subject_name}</option>`
+    ).join("");
+    fields = `
+      <label>Student</label>
+      <select class="form-control" id="edit-student_id">
+        ${studentOptions}
+      </select>
+      <label style="margin-top:0.75rem;">Subject</label>
+      <select class="form-control" id="edit-subject_id">
+        ${subjectOptions}
+      </select>
+      <label style="margin-top:0.75rem;">Score (0–100)</label>
+      <input class="form-control" id="edit-score" type="number" min="0" max="100" value="${record.score}" />
+    `;
+  }
+
+  body.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:0.25rem;">
+      ${fields}
+      <button class="btn btn-primary" style="margin-top:1.25rem;" onclick="submitEdit('${section}', ${id})">Save Changes</button>
+    </div>
+  `;
+
+  document.getElementById("modalBackdrop").classList.add("open");
+}
+
+async function submitEdit(section, id) {
+  let payload = {};
+
+  if (section === "class") {
+    payload.class_name = document.getElementById("edit-class_name").value;
+  } else if (section === "teacher") {
+    payload.name    = document.getElementById("edit-name").value;
+    payload.subject = document.getElementById("edit-subject").value;
+  } else if (section === "subject") {
+    payload.subject_name = document.getElementById("edit-subject_name").value;
+    payload.teacher_id   = document.getElementById("edit-teacher_id").value || null;
+  } else if (section === "student") {
+    payload.name     = document.getElementById("edit-name").value;
+    payload.age      = document.getElementById("edit-age").value || null;
+    payload.class_id = document.getElementById("edit-class_id").value || null;
+  } else if (section === "marks") {
+    payload.student_id = document.getElementById("edit-student_id").value;
+    payload.subject_id = document.getElementById("edit-subject_id").value;
+    payload.score      = document.getElementById("edit-score").value;
+  }
+
+  try {
+    const res = await fetch(`${API}/${section}/${id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (res.ok) {
+      toast("Record updated successfully!");
+      closeModal();
+      loadSectionData();
+    } else {
+      const data = await res.json();
+      toast(data.error || "Update failed");
+    }
+  } catch (err) {
+    toast("Error updating record");
+  }
+}
+
+/* ---------------- DELETE & CLEAR ---------------- */
 
 async function deleteRecord(section, id) {
   if (!confirm(`Delete this record from ${section}?`)) return;
@@ -193,9 +342,7 @@ async function clearSectionData() {
   if (!confirm(`Are you sure you want to permanently delete ALL data in the ${currentSection} section?`)) return;
 
   try {
-    const res = await fetch(`${API}/clear/${currentSection}`, {
-      method: "DELETE"
-    });
+    const res = await fetch(`${API}/clear/${currentSection}`, { method: "DELETE" });
     if (res.ok) {
       toast(`${currentSection} data cleared!`);
       loadSectionData();
@@ -207,14 +354,15 @@ async function clearSectionData() {
   }
 }
 
-/* ---------------- MODAL / UPLOADS ---------------- */
+/* ---------------- ADD / UPLOAD MODAL ---------------- */
 
 function openAddModal() {
   const body = document.getElementById("modalBody");
+  document.getElementById("modalTitle").innerText = "Add Record";
 
   let sectionSelectHtml = '';
   let targetName = currentSection.charAt(0).toUpperCase() + currentSection.slice(1);
-  
+
   if (currentSection === "dashboard") {
     targetName = "Selected Section";
     sectionSelectHtml = `
@@ -253,23 +401,18 @@ async function uploadCSV() {
     toast("Please select a file to upload.");
     return;
   }
-  
+
   let targetSection = currentSection;
   if (currentSection === "dashboard") {
     const select = document.getElementById("uploadSectionSelect");
-    if(select) targetSection = select.value;
+    if (select) targetSection = select.value;
   }
 
-  const file = fileInput.files[0];
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", fileInput.files[0]);
 
   try {
-    const res = await fetch(`${API}/upload/${targetSection}`, {
-      method: "POST",
-      body: formData
-    });
-
+    const res = await fetch(`${API}/upload/${targetSection}`, { method: "POST", body: formData });
     if (res.ok) {
       toast("CSV uploaded successfully");
       closeModal();
@@ -306,26 +449,16 @@ function toast(msg) {
 
 function exportData() {
   let data = [];
-
-  if (currentSection === "class") data = classData;
+  if (currentSection === "class")   data = classData;
   if (currentSection === "teacher") data = teacherData;
   if (currentSection === "subject") data = subjectData;
   if (currentSection === "student") data = studentData;
-  if (currentSection === "marks") data = marksData;
+  if (currentSection === "marks")   data = marksData;
 
-  if (!data.length) {
-    toast("No data to export");
-    return;
-  }
+  if (!data.length) { toast("No data to export"); return; }
 
   const keys = Object.keys(data[0]);
-
-  const csv =
-    keys.join(",") +
-    "\n" +
-    data.map(row =>
-      keys.map(k => row[k]).join(",")
-    ).join("\n");
+  const csv = keys.join(",") + "\n" + data.map(row => keys.map(k => row[k]).join(",")).join("\n");
 
   const blob = new Blob([csv]);
   const a = document.createElement("a");

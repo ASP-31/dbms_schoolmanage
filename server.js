@@ -1,11 +1,10 @@
 // basic Express server for school management system
 
-// load environment variables from .env; fall back to .env.example when the primary file doesn't exist
 const fs = require('fs');
 const dotenv = require('dotenv');
 
 if (fs.existsSync('.env')) {
-  dotenv.config(); // load real environment settings
+  dotenv.config();
 } else if (fs.existsSync('.env.example')) {
   console.warn('WARNING: .env not found, loading variables from .env.example');
   dotenv.config({ path: '.env.example' });
@@ -16,16 +15,17 @@ if (fs.existsSync('.env')) {
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const path = require('path');
+const multer = require('multer');
+const csv = require('csv-parser');
 
-// database connection
 const db = require('./db/connection');
 
-// routers
-const classRouter = require('./routes/class');
+const classRouter   = require('./routes/class');
 const studentRouter = require('./routes/students');
 const teacherRouter = require('./routes/teacher');
 const subjectRouter = require('./routes/subject');
-const marksRouter = require('./routes/marks');
+const marksRouter   = require('./routes/marks');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,28 +34,88 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-const path = require("path");
+app.use(express.static(path.join(__dirname)));
 
-app.use(express.static(path.join(__dirname, )));
 // mount route handlers
-app.use('/api/class', classRouter);
+app.use('/api/class',   classRouter);
 app.use('/api/student', studentRouter);
 app.use('/api/teacher', teacherRouter);
 app.use('/api/subject', subjectRouter);
-app.use('/api/marks', marksRouter);
+app.use('/api/marks',   marksRouter);
 
-const multer = require("multer");
-const csv = require("csv-parser");
+// file upload storage
+const upload = multer({ dest: 'uploads/' });
 
-// store uploaded files
-const upload = multer({ dest: "uploads/" });
-
-// simple health check
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// serve frontend
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// start server after ensuring database connectivity
+// CSV upload
+app.post('/api/upload/:section', upload.single('file'), (req, res) => {
+  const section = req.params.section;
+  const validSections = ['class', 'student', 'teacher', 'subject', 'marks'];
+
+  if (!validSections.includes(section)) {
+    return res.status(400).json({ error: 'Invalid section' });
+  }
+
+  const results = [];
+
+  fs.createReadStream(req.file.path)
+    .pipe(csv())
+    .on('headers', (headers) => {
+      if (headers.length > 0 && headers[0].charCodeAt(0) === 0xFEFF) {
+        headers[0] = headers[0].substring(1);
+      }
+    })
+    .on('data', (data) => results.push(data))
+    .on('end', async () => {
+      try {
+        for (const row of results) {
+          if (section === 'class') {
+            await db.query(`INSERT INTO class (class_name) VALUES (?)`, [row.class_name]);
+          } else if (section === 'student') {
+            await db.query(`INSERT INTO student (name, age, class_id) VALUES (?, ?, ?)`, [row.name, row.age || null, row.class_id || null]);
+          } else if (section === 'teacher') {
+            await db.query(`INSERT INTO teacher (name, subject) VALUES (?, ?)`, [row.name, row.subject || null]);
+          } else if (section === 'subject') {
+            await db.query(`INSERT INTO subject (subject_name, teacher_id) VALUES (?, ?)`, [row.subject_name, row.teacher_id || null]);
+          } else if (section === 'marks') {
+            await db.query(`INSERT INTO marks (student_id, subject_id, score) VALUES (?, ?, ?)`, [row.student_id, row.subject_id, row.score || 0]);
+          }
+        }
+        res.json({ message: 'CSV uploaded successfully' });
+      } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Upload failed' });
+      } finally {
+        fs.unlink(req.file.path, () => {});
+      }
+    });
+});
+
+// clear section
+app.delete('/api/clear/:section', async (req, res) => {
+  const section = req.params.section;
+  const validSections = ['class', 'student', 'teacher', 'subject', 'marks'];
+
+  if (!validSections.includes(section)) {
+    return res.status(400).json({ error: 'Invalid section' });
+  }
+
+  try {
+    await db.query('SET FOREIGN_KEY_CHECKS = 0');
+    await db.query(`TRUNCATE TABLE ${section}`);
+    await db.query('SET FOREIGN_KEY_CHECKS = 1');
+    res.json({ message: `${section} data cleared successfully` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Clear failed' });
+  }
+});
+
+// start server
 async function startServer() {
   try {
     await db.query('SELECT 1');
@@ -87,17 +147,17 @@ async function initializeSchema() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         class_name VARCHAR(100) NOT NULL UNIQUE
       )`,
+      `CREATE TABLE IF NOT EXISTS teacher (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        subject VARCHAR(100)
+      )`,
       `CREATE TABLE IF NOT EXISTS student (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(100) NOT NULL,
         age INT,
         class_id INT,
         FOREIGN KEY (class_id) REFERENCES class(id) ON DELETE SET NULL
-      )`,
-      `CREATE TABLE IF NOT EXISTS teacher (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        subject VARCHAR(100)
       )`,
       `CREATE TABLE IF NOT EXISTS subject (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -124,83 +184,5 @@ async function initializeSchema() {
     process.exit(1);
   }
 }
-
-app.post("/api/upload/:section", upload.single("file"), (req, res) => {
-  const section = req.params.section;
-  const validSections = ["class", "student", "teacher", "subject", "marks"];
-  
-  if (!validSections.includes(section)) {
-    return res.status(400).json({ error: "Invalid section" });
-  }
-
-  const results = [];
-
-  fs.createReadStream(req.file.path)
-    .pipe(csv())
-    .on('headers', (headers) => {
-      // Strip BOM from first header if present just to be absolutely safe
-      if (headers.length > 0 && headers[0].charCodeAt(0) === 0xFEFF) {
-        headers[0] = headers[0].substring(1);
-      }
-    })
-    .on("data", (data) => results.push(data))
-    .on("end", async () => {
-      try {
-        for (const row of results) {
-          if (section === "class") {
-            await db.query(
-              `INSERT INTO class (class_name) VALUES (?)`,
-              [row.class_name]
-            );
-          } else if (section === "student") {
-            await db.query(
-              `INSERT INTO student (name, age, class_id) VALUES (?, ?, ?)`,
-              [row.name, row.age || null, row.class_id || null]
-            );
-          } else if (section === "teacher") {
-            await db.query(
-              `INSERT INTO teacher (name, subject) VALUES (?, ?)`,
-              [row.name, row.subject || null]
-            );
-          } else if (section === "subject") {
-            await db.query(
-              `INSERT INTO subject (subject_name, teacher_id) VALUES (?, ?)`,
-              [row.subject_name, row.teacher_id || null]
-            );
-          } else if (section === "marks") {
-            await db.query(
-              `INSERT INTO marks (student_id, subject_id, score) VALUES (?, ?, ?)`,
-              [row.student_id, row.subject_id, row.score || 0]
-            );
-          }
-        }
-        res.json({ message: "CSV uploaded successfully" });
-      } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: "Upload failed" });
-      } finally {
-        fs.unlink(req.file.path, (e) => {}); // clean up
-      }
-    });
-});
-
-app.delete("/api/clear/:section", async (req, res) => {
-  const section = req.params.section;
-  const validSections = ["class", "student", "teacher", "subject", "marks"];
-  
-  if (!validSections.includes(section)) {
-    return res.status(400).json({ error: "Invalid section" });
-  }
-
-  try {
-    await db.query('SET FOREIGN_KEY_CHECKS = 0');
-    await db.query(`TRUNCATE TABLE ${section}`);
-    await db.query('SET FOREIGN_KEY_CHECKS = 1');
-    res.json({ message: `${section} data cleared successfully` });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Clear failed" });
-  }
-});
 
 startServer();

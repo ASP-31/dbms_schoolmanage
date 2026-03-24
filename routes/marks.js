@@ -14,7 +14,23 @@ router.get('/', async (req, res) => {
     `);
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch' });
+    console.error('Marks GET error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.put('/:id', async (req, res) => {
+  const { student_id, subject_id, score } = req.body;
+  console.log('PUT marks body:', req.body);
+  try {
+    await db.query(
+      'UPDATE marks SET student_id = ?, subject_id = ?, score = ? WHERE id = ?',
+      [student_id, subject_id, score, req.params.id]
+    );
+    res.json({ message: 'Updated' });
+  } catch (err) {
+    console.error('Marks PUT error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
@@ -23,7 +39,8 @@ router.delete('/:id', async (req, res) => {
     await db.query('DELETE FROM marks WHERE id = ?', [req.params.id]);
     res.json({ message: 'Deleted' });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to delete' });
+    console.error('Marks DELETE error:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
